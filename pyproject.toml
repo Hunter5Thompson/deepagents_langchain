@@ -1,7 +1,7 @@
 [project]
 name = "deepagents-langchain"
 version = "0.1.0"
-description = "Add your description here"
+description = "Research Agent with Corporate Proxy Support"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,4 +14,26 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "tavily-python>=0.7.12",
     "tenacity>=9.1.2",
+    "httpx[http2]>=0.28.1",
 ]
+[project.scripts]
+research = "deepagent_app.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.1.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line too long (handled by formatter)
