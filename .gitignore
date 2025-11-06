@@ -1,0 +1,5 @@
+.env
+uv.lock 
+hello.py
+.python-version
+.venv
