@@ -27,3 +27,12 @@ htmlcov/
 # DeepAgents
 agent_files/
 *.tmp
+
+# Database
+*.db
+*.sqlite3
+
+# Certificates
+*.cer
+*.crt
+*.pem

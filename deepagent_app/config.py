@@ -16,15 +16,21 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class Config:
     """Immutable configuration container."""
-    
+
     anthropic_api_key: str
     tavily_api_key: str
     cert_path: Optional[str]
-    
+    database_url: Optional[str] = None
+
     @property
     def has_certificate(self) -> bool:
         """Check if certificate is configured and exists."""
         return self.cert_path is not None
+
+    @property
+    def has_database(self) -> bool:
+        """Check if database is configured."""
+        return self.database_url is not None
 
 
 class ConfigurationError(Exception):
@@ -72,11 +78,19 @@ def load_config() -> Config:
         cert_path = None
     elif cert_path:
         print(f"✅ Certificate loaded: {Path(cert_path).name}")
-    
+
+    # Get optional database URL
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        print(f"✅ Database configured")
+    else:
+        print("ℹ️  No database configured (optional)")
+
     return Config(
         anthropic_api_key=anthropic_key,
         tavily_api_key=tavily_key,
-        cert_path=cert_path
+        cert_path=cert_path,
+        database_url=database_url
     )
 
 

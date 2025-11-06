@@ -25,7 +25,24 @@ Create a `.env` file:
 ANTHROPIC_API_KEY=sk-ant-...
 TAVILY_API_KEY=tvly-...
 COMPANY_CERT_PATH=C:\path\to\company_cert.cer
+
+# Optional: PostgreSQL Database
+DATABASE_URL=postgresql://deepagent:password@localhost:5432/deepagent_db
 ```
+
+### Database Setup (Optional)
+
+The application supports PostgreSQL for storing research queries and results.
+
+```bash
+# Start PostgreSQL with Docker
+docker-compose up -d postgres
+
+# Run database migrations
+uv run alembic upgrade head
+```
+
+See [Database Documentation](docs/DATABASE.md) for detailed setup and usage instructions.
 
 ## Development
 ```bash
@@ -43,6 +60,13 @@ uv run pytest
 
 - `config.py`: Environment and configuration management
 - `http_client.py`: HTTP client factory with cert support
+- `database.py`: Database connection and session management
+- `models/`: SQLAlchemy ORM models
 - `tools/`: Tool definitions (search, etc.)
 - `agents/`: Agent factories
 - `cli.py`: Command-line interface
+- `alembic/`: Database migrations
+
+## Documentation
+
+- [Database Setup and Usage](docs/DATABASE.md) - PostgreSQL integration guide
