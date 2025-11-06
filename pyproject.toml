@@ -8,6 +8,7 @@ dependencies = [
     "deepagents>=0.2.5",
     "langchain-openai>=1.0.2",
     "loguru>=0.7.3",
+    "pydantic-settings>=2.11.0",
     "pydantic>=2.12.4",
     "pytest>=8.4.2",
     "python-dotenv>=1.2.1",

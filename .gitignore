@@ -3,3 +3,5 @@ uv.lock
 hello.py
 .python-version
 .venv
+pyproject.toml
+deepagent_app/__pycache__/
