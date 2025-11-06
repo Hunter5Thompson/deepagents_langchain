@@ -1,18 +1,33 @@
 from __future__ import annotations
-import types
-from agent import build_agent
 
-def test_agent_has_tools():
+from unittest.mock import MagicMock
+
+from deepagent_app.agents import build_agent
+
+
+def test_agent_has_tools(monkeypatch):
+    # Set a dummy API key to allow the agent to be initialized
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test_key")
     agent = build_agent()
     assert hasattr(agent, "invoke")
 
+
 def test_invoke_mocked(monkeypatch):
-    # Monkeypatch the internet_search tool by replacing it in the agent's tool registry if exposed,
-    # or simulate a minimal call path via a stub that bypasses the external call.
+    # Set a dummy API key to allow the agent to be initialized
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test_key")
+
+    # Mock the specific method that makes the API call
+    mock_create = MagicMock(
+        return_value=MagicMock(
+            content=[MagicMock(text='{"messages": ["mocked response"]}')]
+        )
+    )
+    monkeypatch.setattr(
+        "anthropic.resources.messages.Messages.create", mock_create
+    )
+
     agent = build_agent()
 
-    # Fallback: just ensure the shape of response when no real call is made.
-    # This is a smoke test: we only assert the pipeline doesn't explode on minimal input.
     res = agent.invoke({"messages": [{"role": "user", "content": "Hello"}]})
     assert "messages" in res
     assert isinstance(res["messages"], list)
