@@ -5,6 +5,7 @@ Command-line interface for research agents with optional long-term memory.
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import NoReturn, Optional
 
@@ -29,6 +30,67 @@ from deepagent_app.config import (
 from deepagent_app.formatters import MarkdownFormatter
 from deepagent_app.http_client import create_http_client
 from deepagent_app.tools import create_search_tool
+
+try:  # Anthropic SDK exposes transient overload errors here
+    from anthropic._exceptions import OverloadedError as AnthropicOverloadedError
+except Exception:  # pragma: no cover - defensive import for optional dependency
+    AnthropicOverloadedError = None
+
+
+def _invoke_with_retries(agent, payload, *, config, max_attempts: int = 3) -> object:
+    """Invoke an agent with basic retries for transient Anthropic overloads."""
+
+    retryable = () if AnthropicOverloadedError is None else (AnthropicOverloadedError,)
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            return agent.invoke(payload, config=config)
+        except retryable as exc:  # pragma: no cover - depends on Anthropic runtime
+            if attempt >= max_attempts:
+                raise
+
+            delay = 2 ** (attempt - 1)
+            print(
+                "⚠️  Anthropic overloaded. "
+                f"Retrying in {delay}s (attempt {attempt + 1}/{max_attempts})"
+            )
+            time.sleep(delay)
+
+
+def _build_agent(
+    agent_type: str,
+    search_tool,
+    *,
+    use_memory: bool,
+):
+    """Create agent instance and return tuple (agent, memory_enabled, label)."""
+
+    if agent_type == "v2":
+        if use_memory:
+            store = create_shared_store()
+            agent = create_memory_research_agent(search_tool, store=store)
+            return agent, True, "🧠 Memory-enabled (v2)"
+
+        agent = create_research_agent(search_tool)
+        return agent, False, "📝 One-shot mode (v2)"
+
+    store = create_shared_store()
+    if agent_type == "simple-sequential":
+        agent = create_simple_sequential_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Simple sequential workflow (v3)"
+
+    if agent_type == "parallel-shared":
+        agent = create_parallel_shared_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Parallel shared workflow (v3)"
+
+    raise ValueError(f"Unknown agent type: {agent_type}")
 
 
 def _build_agent(
@@ -130,9 +192,11 @@ def run_research(
         
         # Execute research
         print(f"🔍 Research: {query}\n")
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": query}]},
-            config=agent_config
+        payload = {"messages": [{"role": "user", "content": query}]}
+        result = _invoke_with_retries(
+            agent,
+            payload,
+            config=agent_config,
         )
         
         # Extract content
