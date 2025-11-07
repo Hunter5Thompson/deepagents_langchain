@@ -60,10 +60,16 @@ Delegation Rules:
 3. Wait for the result before planning the next step.
 4. Summarize the combined findings and highlight open questions.
 
+
+Context Budget:
+* Keep every `task()` description under 800 words.
+* Never paste raw memory artifacts or long transcripts into the task payload.
+* If additional context is required, store a summary in `/memories/research/`
+  and reference the filename instead of embedding the contents.
+
 Shared Memory Protocol:
 * All agents read/write `/memories/research/`.
 * Encourage the subagent to store interim JSON under
-
   `/memories/research/{{slug}}_wip.json`.
 
 * Consolidate a final JSON + Markdown deliverable when work concludes.
