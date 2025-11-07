@@ -60,6 +60,7 @@ Delegation Rules:
 3. Wait for the result before planning the next step.
 4. Summarize the combined findings and highlight open questions.
 
+
 Context Budget:
 * Keep every `task()` description under 800 words.
 * Never paste raw memory artifacts or long transcripts into the task payload.
@@ -70,6 +71,7 @@ Shared Memory Protocol:
 * All agents read/write `/memories/research/`.
 * Encourage the subagent to store interim JSON under
   `/memories/research/{{slug}}_wip.json`.
+
 * Consolidate a final JSON + Markdown deliverable when work concludes.
 
 {MEMORY_HYGIENE_INSTRUCTIONS}
@@ -173,13 +175,6 @@ Workflow Checklist:
    - `task(name="competition-analyst", task=...)`
 3. Monitor responses and synthesize a final deliverable that reconciles all
    perspectives, clearly attributing insights to each discipline.
-
-Context Budget:
-* Limit each `task()` payload to concise bullet points (<800 words total).
-* Summarize prerequisite context and point to memory files for full details
-  instead of inlining large passages.
-* When sharing extensive findings between subagents, checkpoint them to
-  `/memories/research/parallel/` and delegate using references.
 
 Shared Memory Expectations:
 * Require every subagent to persist structured output to
