@@ -16,6 +16,10 @@ from deepagent_app.agents.research_v2 import (
     create_research_agent,
     create_shared_store,
 )
+from deepagent_app.agents.research_v3 import (
+    create_parallel_shared_research_agent,
+    create_simple_sequential_research_agent,
+)
 from deepagent_app.config import (
     Config,
     ConfigurationError,
@@ -27,13 +31,50 @@ from deepagent_app.http_client import create_http_client
 from deepagent_app.tools import create_search_tool
 
 
+def _build_agent(
+    agent_type: str,
+    search_tool,
+    *,
+    use_memory: bool,
+):
+    """Create agent instance and return tuple (agent, memory_enabled, label)."""
+
+    if agent_type == "v2":
+        if use_memory:
+            store = create_shared_store()
+            agent = create_memory_research_agent(search_tool, store=store)
+            return agent, True, "🧠 Memory-enabled (v2)"
+
+        agent = create_research_agent(search_tool)
+        return agent, False, "📝 One-shot mode (v2)"
+
+    store = create_shared_store()
+    if agent_type == "simple-sequential":
+        agent = create_simple_sequential_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Simple sequential workflow (v3)"
+
+    if agent_type == "parallel-shared":
+        agent = create_parallel_shared_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Parallel shared workflow (v3)"
+
+    raise ValueError(f"Unknown agent type: {agent_type}")
+
+
 def run_research(
     query: str,
     config: Config,
+    *,
     thread_id: Optional[str] = None,
     use_memory: bool = False,
     save_markdown: bool = True,
-    output_dir: Path = Path("outputs/research")
+    output_dir: Path = Path("outputs/research"),
+    agent_type: str = "v2",
 ) -> None:
     """
     Execute research query with optional memory.
@@ -49,7 +90,11 @@ def run_research(
     Raises:
         ValueError: If use_memory=True but thread_id=None
     """
-    if use_memory and not thread_id:
+    memory_required = use_memory
+    if agent_type != "v2":
+        memory_required = True
+
+    if memory_required and not thread_id:
         raise ValueError(
             "thread_id required when use_memory=True\n"
             "Use --thread to specify a session ID"
@@ -67,14 +112,17 @@ def run_research(
         search_tool = create_search_tool(config.tavily_api_key)
         
         # Create agent (with or without memory)
-        if use_memory:
-            store = create_shared_store()  # Or create_file_store() for persistence
-            agent = create_memory_research_agent(search_tool, store=store)
-            print(f"🧠 Memory enabled (thread: {thread_id})")
+        agent, memory_enabled, label = _build_agent(
+            agent_type,
+            search_tool,
+            use_memory=use_memory,
+        )
+
+        if memory_enabled:
+            print(f"{label} (thread: {thread_id})")
         else:
-            agent = create_research_agent(search_tool)
-            print("📝 One-shot mode (no memory)")
-        
+            print(label)
+
         # Prepare config with thread_id
         agent_config = {}
         if thread_id:
@@ -133,21 +181,27 @@ def run_research(
 def main() -> NoReturn:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="DeepAgents Research - With Memory Support",
+        description="DeepAgents Research - With Memory & Subagent Workflows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # One-shot research (no memory)
   %(prog)s "What is LangGraph?"
-  
+
   # Research with memory (session 1)
   %(prog)s "Research Bitcoin" --memory --thread btc-study
-  
+
   # Continue previous session
   %(prog)s "Bitcoin updates 2024?" --memory --thread btc-study
-  
+
   # New topic, same thread (builds context)
   %(prog)s "Ethereum comparison" --memory --thread btc-study
+
+  # V3 sequential coordinator (memory required)
+  %(prog)s "Was sind 3D Gaussian Splatting?" --workflow simple-sequential --thread 3dgs-research
+
+  # V3 parallel coordinator (memory required)
+  %(prog)s "Analyse AI chip market" --workflow parallel-shared --thread ai-chips
         """
     )
     
@@ -182,7 +236,18 @@ Examples:
         default=Path("outputs/research"),
         help="Output directory (default: outputs/research)"
     )
-    
+
+    parser.add_argument(
+        "--workflow",
+        choices=("v2", "simple-sequential", "parallel-shared"),
+        default="v2",
+        help=(
+            "Select agent workflow: 'v2' (default), 'simple-sequential' for the "
+            "V3 baton-pass coordinator, or 'parallel-shared' for the V3 "
+            "multi-specialist team."
+        ),
+    )
+
     # Debug
     parser.add_argument(
         "-v", "--verbose",
@@ -200,7 +265,8 @@ Examples:
             thread_id=args.thread,
             use_memory=args.memory,
             save_markdown=not args.no_save,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            agent_type=args.workflow,
         )
     except ConfigurationError as exc:
         print(f"❌ Configuration Error: {exc}")
