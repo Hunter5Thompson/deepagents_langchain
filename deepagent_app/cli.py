@@ -93,6 +93,41 @@ def _build_agent(
     raise ValueError(f"Unknown agent type: {agent_type}")
 
 
+def _build_agent(
+    agent_type: str,
+    search_tool,
+    *,
+    use_memory: bool,
+):
+    """Create agent instance and return tuple (agent, memory_enabled, label)."""
+
+    if agent_type == "v2":
+        if use_memory:
+            store = create_shared_store()
+            agent = create_memory_research_agent(search_tool, store=store)
+            return agent, True, "🧠 Memory-enabled (v2)"
+
+        agent = create_research_agent(search_tool)
+        return agent, False, "📝 One-shot mode (v2)"
+
+    store = create_shared_store()
+    if agent_type == "simple-sequential":
+        agent = create_simple_sequential_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Simple sequential workflow (v3)"
+
+    if agent_type == "parallel-shared":
+        agent = create_parallel_shared_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Parallel shared workflow (v3)"
+
+    raise ValueError(f"Unknown agent type: {agent_type}")
+
+
 def run_research(
     query: str,
     config: Config,
