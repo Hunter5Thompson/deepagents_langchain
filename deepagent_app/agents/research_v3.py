@@ -63,7 +63,9 @@ Delegation Rules:
 Shared Memory Protocol:
 * All agents read/write `/memories/research/`.
 * Encourage the subagent to store interim JSON under
-  `/memories/research/{slug}_wip.json`.
+
+  `/memories/research/{{slug}}_wip.json`.
+
 * Consolidate a final JSON + Markdown deliverable when work concludes.
 
 {MEMORY_HYGIENE_INSTRUCTIONS}
