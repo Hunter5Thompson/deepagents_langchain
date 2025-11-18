@@ -29,6 +29,7 @@ from deepagent_app.config import (
 )
 from deepagent_app.formatters import MarkdownFormatter
 from deepagent_app.http_client import create_http_client
+from deepagent_app.telemetry import create_langfuse_callbacks
 from deepagent_app.tools import create_search_tool
 
 try:  # Anthropic SDK exposes transient overload errors here
@@ -189,6 +190,15 @@ def run_research(
         agent_config = {}
         if thread_id:
             agent_config = {"configurable": {"thread_id": thread_id}}
+
+        callbacks = create_langfuse_callbacks(
+            config,
+            agent_type=agent_type,
+            thread_id=thread_id,
+            query=query,
+        )
+        if callbacks:
+            print("📡 Langfuse tracing enabled for this run")
         
         # Execute research
         print(f"🔍 Research: {query}\n")

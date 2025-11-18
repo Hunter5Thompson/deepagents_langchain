@@ -16,15 +16,29 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class Config:
     """Immutable configuration container."""
-    
+
     anthropic_api_key: str
     tavily_api_key: str
     cert_path: Optional[str]
-    
+    langfuse_enabled: bool = False
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_host: Optional[str] = None
+    langfuse_release: Optional[str] = None
+
     @property
     def has_certificate(self) -> bool:
         """Check if certificate is configured and exists."""
         return self.cert_path is not None
+
+    @property
+    def langfuse_active(self) -> bool:
+        """Return True when Langfuse tracing is fully configured and enabled."""
+        return (
+            self.langfuse_enabled
+            and bool(self.langfuse_public_key)
+            and bool(self.langfuse_secret_key)
+        )
 
 
 class ConfigurationError(Exception):
@@ -73,10 +87,30 @@ def load_config() -> Config:
     elif cert_path:
         print(f"✅ Certificate loaded: {Path(cert_path).name}")
     
+    langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+    langfuse_host = os.getenv("LANGFUSE_HOST") or "https://cloud.langfuse.com"
+    langfuse_release = os.getenv("LANGFUSE_RELEASE")
+
+    if langfuse_enabled and not (langfuse_public_key and langfuse_secret_key):
+        print("⚠️  LANGFUSE_ENABLED set but API keys missing – disabling tracing.")
+        langfuse_enabled = False
+
     return Config(
         anthropic_api_key=anthropic_key,
         tavily_api_key=tavily_key,
-        cert_path=cert_path
+        cert_path=cert_path,
+        langfuse_enabled=langfuse_enabled,
+        langfuse_public_key=langfuse_public_key,
+        langfuse_secret_key=langfuse_secret_key,
+        langfuse_host=langfuse_host if langfuse_enabled else None,
+        langfuse_release=langfuse_release,
     )
 
 
