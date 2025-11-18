@@ -32,82 +32,66 @@ from deepagent_app.http_client import create_http_client
 from deepagent_app.telemetry import create_langfuse_callbacks
 from deepagent_app.tools import create_search_tool
 
-try:  # Anthropic SDK exposes transient overload/rate limit errors here
+try:  # Anthropic SDK exposes transient overload errors here
     from anthropic._exceptions import OverloadedError as AnthropicOverloadedError
 except Exception:  # pragma: no cover - defensive import for optional dependency
     AnthropicOverloadedError = None
 
-try:
-    from anthropic._exceptions import RateLimitError as AnthropicRateLimitError
-except Exception:  # pragma: no cover - defensive import for optional dependency
-    AnthropicRateLimitError = None
 
+def _invoke_with_retries(agent, payload, *, config, max_attempts: int = 3) -> object:
+    """Invoke an agent with basic retries for transient Anthropic overloads."""
 
-def _extract_retry_after_seconds(error: Exception) -> Optional[int]:
-    """Best-effort extraction of a retry delay from Anthropic errors."""
-
-    response = getattr(error, "response", None)
-    if response is None:
-        return None
-
-    headers = getattr(response, "headers", None)
-    if headers is None:
-        return None
-
-    retry_after = headers.get("retry-after") or headers.get("Retry-After")
-    if retry_after is None:
-        return None
-
-    try:
-        return int(float(retry_after))
-    except (TypeError, ValueError):
-        return None
-
-
-def _invoke_with_retries(
-    agent,
-    payload,
-    *,
-    config,
-    callbacks = None,
-    max_attempts: int = 3,
-) -> object:
-    """Invoke an agent with retries for transient Anthropic overloads or rate limits."""
-
-    retryable = tuple(
-        error
-        for error in (AnthropicOverloadedError, AnthropicRateLimitError)
-        if error is not None
-    )
+    retryable = () if AnthropicOverloadedError is None else (AnthropicOverloadedError,)
     attempt = 0
     while True:
         attempt += 1
         try:
-            return agent.invoke(payload, config=config, callbacks=callbacks)
-        except Exception as exc:  # pragma: no cover - depends on Anthropic runtime
-            if not retryable or not isinstance(exc, retryable):
-                raise
-
+            return agent.invoke(payload, config=config)
+        except retryable as exc:  # pragma: no cover - depends on Anthropic runtime
             if attempt >= max_attempts:
                 raise
 
             delay = 2 ** (attempt - 1)
-            reason = "Anthropic transient error"
-
-            if AnthropicOverloadedError and isinstance(exc, AnthropicOverloadedError):
-                reason = "Anthropic overloaded"
-
-            if AnthropicRateLimitError and isinstance(exc, AnthropicRateLimitError):
-                reason = "Anthropic rate limit hit"
-                retry_after = _extract_retry_after_seconds(exc)
-                if retry_after:
-                    delay = max(delay, retry_after)
-
             print(
-                "⚠️  "
-                f"{reason}. Retrying in {delay}s (attempt {attempt + 1}/{max_attempts})"
+                "⚠️  Anthropic overloaded. "
+                f"Retrying in {delay}s (attempt {attempt + 1}/{max_attempts})"
             )
             time.sleep(delay)
+
+
+def _build_agent(
+    agent_type: str,
+    search_tool,
+    *,
+    use_memory: bool,
+):
+    """Create agent instance and return tuple (agent, memory_enabled, label)."""
+
+    if agent_type == "v2":
+        if use_memory:
+            store = create_shared_store()
+            agent = create_memory_research_agent(search_tool, store=store)
+            return agent, True, "🧠 Memory-enabled (v2)"
+
+        agent = create_research_agent(search_tool)
+        return agent, False, "📝 One-shot mode (v2)"
+
+    store = create_shared_store()
+    if agent_type == "simple-sequential":
+        agent = create_simple_sequential_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Simple sequential workflow (v3)"
+
+    if agent_type == "parallel-shared":
+        agent = create_parallel_shared_research_agent(
+            search_tool,
+            store=store,
+        )
+        return agent, True, "🧠 Parallel shared workflow (v3)"
+
+    raise ValueError(f"Unknown agent type: {agent_type}")
 
 
 def _build_agent(
@@ -223,7 +207,6 @@ def run_research(
             agent,
             payload,
             config=agent_config,
-            callbacks=callbacks or None,
         )
         
         # Extract content
